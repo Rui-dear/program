@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短视频选题评估 DSS - 智能决策系统</title>
+    <style>
+        :root {
+            --bg: #07111f;
+            --bg-soft: #0d1830;
+            --card: rgba(255, 255, 255, 0.08);
+            --card-strong: rgba(255, 255, 255, 0.14);
+            --line: rgba(255, 255, 255, 0.15);
+            --text: #f8fbff;
+            --muted: #a8b8d0;
+            --brand: #7c5cff;
+            --brand-2: #24d3ee;
+            --brand-3: #fff0a6;
+            --good: #30e0a1;
+            --warn: #ffd166;
+            --danger: #ff6b8a;
+            --shadow: 0 26px 90px rgba(0, 0, 0, 0.36);
+            --radius-xl: 34px;
+            --radius-lg: 24px;
+            --radius-md: 18px;
+        }
+
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(circle at 12% 8%, rgba(124, 92, 255, 0.44), transparent 28%),
+                radial-gradient(circle at 86% 12%, rgba(36, 211, 238, 0.32), transparent 27%),
+                radial-gradient(circle at 52% 88%, rgba(255, 209, 102, 0.12), transparent 24%),
+                linear-gradient(135deg, #07101e 0%, #111a31 52%, #090f1c 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+            background-size: 44px 44px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent 78%);
+        }
+
+        a { color: inherit; text-decoration: none; }
+        button, input, textarea, select { font: inherit; }
+        button { border: 0; }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            width: min(1240px, calc(100% - 40px));
+            margin: 0 auto;
+            padding: 28px 0 54px;
+        }
+
+        .nav {
+            position: sticky;
+            top: 16px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 34px;
+            padding: 13px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            background: rgba(7, 17, 31, 0.72);
+            backdrop-filter: blur(22px);
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.20);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: max-content;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+        }
+
+        .brand-mark {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            color: #06111f;
+            background: linear-gradient(135deg, #7df9ff, #a99bff 56%, #fff0a6);
+            box-shadow: 0 14px 38px rgba(36, 211, 238, 0.28);
+        }
+
+        .steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .step-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 13px;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            color: var(--muted);
+            cursor: pointer;
+            background: rgba(255,255,255,0.04);
+            transition: color .2s ease, background .2s ease, border-color .2s ease, transform .2s ease;
+        }
+
+        .step-pill:hover { transform: translateY(-1px); }
+
+        .step-pill .num {
+            width: 22px;
+            height: 22px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            color: #cfe7ff;
+            background: rgba(255,255,255,0.10);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .step-pill.active {
+            color: var(--text);
+            border-color: rgba(36, 211, 238, 0.36);
+            background: rgba(36, 211, 238, 0.10);
+        }
+
+        .nav-link {
+            min-width: max-content;
+            padding: 10px 15px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .view { display: none; animation: fadeUp .32s ease both; }
+        .view.active { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(180deg, var(--card-strong), rgba(255, 255, 255, 0.055));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(24px);
+        }
+
+        .intro-shell {
+            min-height: calc(100vh - 150px);
+            display: grid;
+            grid-template-columns: 1.08fr .92fr;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .intro-copy { padding: 22px 0; }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 13px;
+            border: 1px solid rgba(36, 211, 238, 0.30);
+            border-radius: 999px;
+            color: #baf7ff;
+            background: rgba(36, 211, 238, 0.08);
+            margin-bottom: 22px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(42px, 6vw, 76px);
+            line-height: 1.02;
+            letter-spacing: -0.065em;
+        }
+
+        .gradient-text {
+            color: transparent;
+            background: linear-gradient(110deg, #ffffff, #9eeeff 45%, #b7a8ff 92%);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .subtitle {
+            max-width: 670px;
+            margin: 24px 0 30px;
+            color: var(--muted);
+            font-size: 18px;
+            line-height: 1.85;
+        }
+
+        .hero-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 52px;
+            padding: 15px 22px;
+            border-radius: 18px;
+            color: #06111f;
+            cursor: pointer;
+            font-weight: 900;
+            letter-spacing: 0.035em;
+            background: linear-gradient(135deg, #7df9ff, #a99bff 52%, #fff0a6);
+            box-shadow: 0 18px 46px rgba(124, 92, 255, 0.32);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+
+        .button:hover { transform: translateY(-2px); filter: saturate(1.08); box-shadow: 0 22px 54px rgba(124, 92, 255, 0.42); }
+        .button:disabled { cursor: not-allowed; opacity: 0.68; transform: none; }
+
+        .ghost-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 52px;
+            padding: 14px 18px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            color: var(--text);
+            cursor: pointer;
+            background: rgba(255,255,255,0.07);
+            transition: background .2s ease, border-color .2s ease;
+        }
+
+        .ghost-button:hover { background: rgba(255,255,255,0.12); border-color: rgba(36,211,238,0.38); }
+
+        .intro-panel { padding: 24px; }
+
+        .preview-card {
+            position: relative;
+            overflow: hidden;
+            padding: 28px;
+            border-radius: 30px;
+            background:
+                linear-gradient(145deg, rgba(36,211,238,0.16), rgba(124,92,255,0.12)),
+                rgba(255,255,255,0.06);
+        }
+
+        .preview-card::after {
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -80px;
+            top: -70px;
+            border-radius: 50%;
+            background: rgba(36, 211, 238, .18);
+            filter: blur(4px);
+        }
+
+        .score-demo {
+            position: relative;
+            width: 186px;
+            height: 186px;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 24px;
+            border-radius: 50%;
+            background: conic-gradient(var(--good) 82%, rgba(255,255,255,0.12) 0);
+        }
+
+        .score-demo::after {
+            content: "";
+            position: absolute;
+            inset: 13px;
+            border-radius: 50%;
+            background: #111a31;
+            box-shadow: inset 0 0 30px rgba(255,255,255,0.06);
+        }
+
+        .score-demo strong {
+            position: relative;
+            z-index: 1;
+            font-size: 44px;
+            letter-spacing: -0.05em;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 26px;
+        }
+
+        .feature-card { padding: 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
+        .feature-card b { display: block; margin-bottom: 6px; font-size: 18px; }
+        .feature-card span { color: var(--muted); font-size: 13px; line-height: 1.65; }
+
+        .section-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 18px;
+            margin: 0 0 22px;
+        }
+
+        .section-title { margin: 0 0 8px; font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.04em; }
+        .section-desc { margin: 0; color: var(--muted); line-height: 1.75; }
+
+        .input-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.32fr) minmax(320px, .68fr);
+            gap: 22px;
+            align-items: start;
+        }
+
+        .form-card, .side-card, .report-card { padding: 26px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .field { margin-bottom: 2px; }
+        .wide { grid-column: 1 / -1; }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: #d9e5f6;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .hint { color: var(--muted); font-weight: 500; }
+
+        input, textarea, select {
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 16px;
+            outline: none;
+            padding: 14px 15px;
+            color: var(--text);
+            background: rgba(5, 12, 25, 0.58);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        textarea { min-height: 136px; resize: vertical; }
+        input:focus, textarea:focus, select:focus { border-color: rgba(36, 211, 238, 0.76); box-shadow: 0 0 0 4px rgba(36, 211, 238, 0.12); background: rgba(5, 12, 25, 0.78); }
+        select option { background: #111a31; }
+        input[type="range"] { padding: 0; accent-color: var(--brand-2); cursor: pointer; }
+
+        .form-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+
+        .status {
+            min-height: 22px;
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .side-list { display: grid; gap: 16px; margin-top: 18px; }
+        
+        .weight-sum-box {
+            margin-top: 20px;
+            padding: 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px dashed var(--line);
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .weight-sum-box b { color: var(--brand-2); }
+
+        .report-hero {
+            display: grid;
+            grid-template-columns: 330px minmax(0, 1fr);
+            gap: 22px;
+            align-items: stretch;
+            margin-bottom: 22px;
+        }
+
+        .score-card { padding: 26px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+
+        .score-ring {
+            width: 170px;
+            height: 170px;
+            margin: 12px auto 18px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: conic-gradient(var(--good) calc(var(--score) * 1%), rgba(255, 255, 255, 0.12) 0);
+            position: relative;
+        }
+
+        .score-ring::after {
+            content: "";
+            position: absolute;
+            inset: 14px;
+            border-radius: 50%;
+            background: #111a31;
+            box-shadow: inset 0 0 30px rgba(255,255,255,0.06);
+        }
+
+        .score-ring strong { position: relative; z-index: 1; font-size: 48px; letter-spacing: -0.05em; }
+
+        .formula-box {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px dashed var(--line);
+            text-align: left;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+        .formula-box b { color: var(--brand-3); }
+
+        .radar-card { padding: 26px; }
+        .radar-layout {
+    display: grid;
+    grid-template-columns: 1.8fr 1fr; 
+    gap: 24px;
+    align-items: center;
+}
+        
+        .radar-chart-container {
+             position: relative;
+             width: 100%;
+             max-width: 480px;        /* 可根据需要调整最大值 */
+             height: 340px;     
+             border: 1px solid rgba(255, 255, 255, 0.10);
+             border-radius: 24px;
+             background: rgba(255, 255, 255, 0.02);
+             overflow: hidden;
+         }
+         #radarCanvas { display: block; width: 100%; height: 100%; }
+
+        .radar-dimensions { display: grid; gap: 12px; }
+        .dimension-row {
+             padding: 10px;           /* 原 13px */
+             border: 1px solid rgba(255, 255, 255, 0.10);
+             border-radius: 18px;
+             background: rgba(255,255,255,0.055);
+         }
+         .dimension-meta {
+             display: flex;
+             justify-content: space-between;
+             gap: 12px;
+             color: var(--muted);
+             font-size: 12px;         /* 原 13px */
+         }
+         .dimension-meta b {
+             color: var(--text);
+             font-size: 13px;         /* 原 15px */
+         }
+         .dimension-track {
+             height: 7px;             /* 原 9px */
+             overflow: hidden;
+             border-radius: 999px;
+             margin: 8px 0 5px;       /* 原 10px 0 7px */
+             background: rgba(255, 255, 255, 0.10);
+         }
+        .dimension-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand-2), var(--brand)); transition: width 0.6s cubic-bezier(0.1, 1, 0.1, 1); }
+        .dimension-desc { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+        
+        .report-summary { padding: 26px; }
+        .summary-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+        .level-badge { padding: 9px 13px; border-radius: 999px; color: #06111f; background: linear-gradient(135deg, #7df9ff, #fff0a6); font-weight: 900; }
+        
+        .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+        .report-stack { display: grid; gap: 22px; }
+        .horizontal-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+        .report-card h3 { margin: 0 0 14px; font-size: 22px; }
+        .case-item, .advice-item, .rule-item { padding: 15px; border-radius: 18px; margin-top: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
+        .case-item b, .rule-item b { display: block; margin-bottom: 8px; }
+        .case-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 13px; }
+        .tag { padding: 6px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); }
+        .empty-state { padding: 26px; border: 1px dashed rgba(255, 255, 255, 0.18); border-radius: 20px; color: var(--muted); font-size: 15px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <nav class="nav">
+            <div class="brand">
+                <span class="brand-mark">DSS</span>
+                <span>选题评估系统</span>
+            </div>
+            <div class="steps">
+                <div id="pill-intro" class="step-pill active" onclick="location.hash='intro'"><span class="num">1</span>系统简介</div>
+                <div id="pill-input" class="step-pill" onclick="location.hash='input'"><span class="num">2</span>特征输入</div>
+                <div id="pill-report" class="step-pill" onclick="location.hash='report'"><span class="num">3</span>多维评估</div>
+                <div id="pill-rewrite" class="step-pill" onclick="location.hash='rewrite'"><span class="num">4</span>AI重写</div>
+            </div>
+            <a class="nav-link" href="/docs" target="_blank">API文档</a>
+        </nav>
+
+        <!-- 视图 1：简介 -->
+        <section id="view-intro" class="view active">
+            <div class="intro-shell">
+                <div class="intro-copy">
+                    <span class="eyebrow">🚀 通用画像解耦体系 · 四因子加权决策模型</span>
+                    <h1>短视频选题评估<br><span class="gradient-text">决策支持系统 (DSS)</span></h1>
+                    <p class="subtitle">面向全行业短视频创作者。前端深度解耦标准化全域创作者用户画像体系，后台联动自适应数据检索资源库，辅以 AHP 权重偏置，全方位智能算力输出客观得分报告。</p>
+                    <div class="hero-actions">
+                        <button class="button" onclick="location.hash='input'">进入特征输入页 &rarr;</button>
+                    </div>
+                </div>
+                <div class="intro-panel">
+                    <div class="card preview-card">
+                        <div class="score-demo"><strong>86.5</strong></div>
+                        <div class="feature-grid">
+                            <div class="feature-card"><b>解耦画像体系</b><span>前端采用高兼容性的通用赛道与受众标签，与后台案例库底层数据链深度剥离。</span></div>
+                            <div class="feature-card"><b>四因子模型</b><span>基于情感倾向、热点匹配、历史成功与时效矩阵综合计算，符合严谨科学论证。</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 视图 2：输入 -->
+        <section id="view-input" class="view">
+            <div class="section-head">
+                <div>
+                    <h2 class="section-title">特征参数输入</h2>
+                    <p class="section-desc">请下拉配置匹配最符合的创作者通用全域画像。右侧为 AHP 层次权重矩阵，支持专家级精细微调。</p>
+                </div>
+                <button id="btn-new-report" class="ghost-button" style="border-radius:12px; padding:10px 16px;">清空重新开始</button>
+            </div>
+            <form id="dds-form" class="input-layout" onsubmit="return false;">
+                <div class="card form-card">
+                    <div class="form-grid">
+                        <div class="field wide">
+                            <label>视频拟发布标题</label>
+                            <input id="title" type="text" required placeholder="例如：15万元级混动轿车横评，哪一款才是家庭首选？">
+                        </div>
+                        <div class="field">
+                            <label>赛道领域 (Domain)</label>
+                            <select id="domain">
+                                <option value="知识科普">知识科普</option>
+                                <option value="教育学习">教育学习</option>
+                                <option value="职场成长">职场成长</option>
+                                <option value="财经商业">财经商业</option>
+                                <option value="科技数码">科技数码</option>
+                                <option value="AI与互联网">AI与互联网</option>
+                                <option value="健康医疗">健康医疗</option>
+                                <option value="母婴育儿">母婴育儿</option>
+                                <option value="情感心理">情感心理</option>
+                                <option value="法律普法">法律普法</option>
+                                <option value="生活技巧">生活技巧</option>
+                                <option value="个人成长">个人成长</option>
+                                <option value="美食餐饮">美食餐饮</option>
+                                <option value="旅游出行">旅游出行</option>
+                                <option value="时尚美妆">时尚美妆</option>
+                                <option value="运动健身">运动健身</option>
+                                <option value="汽车资讯">汽车资讯</option>
+                                <option value="房产家居">房产家居</option>
+                                <option value="娱乐影视">娱乐影视</option>
+                                <option value="游戏动漫">游戏动漫</option>
+                                <option value="宠物萌宠">宠物萌宠</option>
+                                <option value="社会热点">社会热点</option>
+                                <option value="企业品牌营销">企业品牌营销</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>拟发布主平台</label>
+                            <select id="publish_platform">
+                                <option value="抖音">抖音</option>
+                                <option value="小红书">小红书</option>
+                                <option value="B站">B站</option>
+                                <option value="视频号">视频号</option>
+                            </select>
+                        </div>
+                        <div class="field wide">
+                            <label>核心内容文本草稿 / 提纲摘要</label>
+                            <textarea id="content_draft" placeholder="请在此粘贴您的核心文案草稿、主线论据或大纲逻辑。越详细算法计算越精准..."></textarea>
+                        </div>
+                        <div class="field">
+                            <label>目标受众需求定位 (Audience)</label>
+                            <select id="target_audience">
+                                <option value="泛大众用户">泛大众用户（通识科普/社会热点/娱乐生活）</option>
+                                <option value="消费决策人群">消费决策人群（好物测评/买车买房/数码选购）</option>
+                                <option value="学习成长人群">学习成长人群（技能提升/考公考研/AI教程）</option>
+                                <option value="职场发展人群">职场发展人群（通用职业技能/简历公积金/跳槽指南）</option>
+                                <option value="家庭育儿人群">家庭育儿人群（母婴用品/儿童教育/家庭生活）</option>
+                                <option value="健康关注人群">健康关注人群（养生医疗/减脂健身/慢病防护）</option>
+                                <option value="创业商业人群">创业商业人群（副业搞钱/商业搞钱/企业营销）</option>
+                                <option value="兴趣爱好人群">兴趣爱好人群（潮流风向/游戏动漫/小众圈层）</option>
+                                <option value="专业从业者">专业从业者（行业深剖/垂直B端技术交付）</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>内容交付核心目标 (Goal)</label>
+                            <select id="content_goal">
+                                <option value="获取点赞">获取点赞</option>
+                                <option value="促进收藏">促进收藏</option>
+                                <option value="引导评论">引导评论</option>
+                                <option value="促进转发">促进转发</option>
+                                <option value="获取关注">获取关注</option>
+                                <option value="品牌曝光">品牌曝光</option>
+                                <option value="线索收集">线索收集</option>
+                                <option value="商品转化">商品转化</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>黄金开头钩子类型 (Hook)</label>
+                            <select id="hook_type">
+                                <option value="痛点直击">痛点直击</option>
+                                <option value="结果前置">结果前置</option>
+                                <option value="反常识观点">反常识观点</option>
+                                <option value="悬念提问">悬念提问</option>
+                                <option value="场景代入">场景代入</option>
+                                <option value="风险警示">风险警示</option>
+                                <option value="案例展示">案例展示</option>
+                                <option value="数据冲击">数据冲击</option>
+                                <option value="身份共鸣">身份共鸣</option>
+                                <option value="冲突对比">冲突对比</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>内容框架结构 (Structure)</label>
+                            <select id="content_structure">
+                                <option value="总分总结构">总分总结构</option>
+                                <option value="问题解决结构">问题解决结构</option>
+                                <option value="案例拆解结构">案例拆解结构</option>
+                                <option value="步骤清单结构">步骤清单结构</option>
+                                <option value="故事叙事结构">故事叙述结构</option>
+                                <option value="对比分析结构">对比分析结构</option>
+                                <option value="误区纠正结构">误区纠正结构</option>
+                                <option value="经验分享结构">经验分享结构</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>典型行为观看场景 (Scenario)</label>
+                            <select id="scenario">
+                                <option value="通勤途中">通勤途中</option>
+                                <option value="午休时间">午休时间</option>
+                                <option value="下班后">下班后</option>
+                                <option value="睡前浏览">睡前浏览</option>
+                                <option value="学习提升">学习提升</option>
+                                <option value="工作办公">工作办公</option>
+                                <option value="育儿场景">育儿场景</option>
+                                <option value="购物决策前">购物决策前</option>
+                                <option value="遇到问题主动搜索">遇到问题主动搜索</option>
+                                <option value="娱乐放松">娱乐放松</option>
+                                <option value="碎片化浏览">碎片化浏览</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>视频预计时长 (秒)</label>
+                            <input id="duration_sec" type="number" min="5" max="600" value="60">
+                        </div>
+                        
+                        <div class="field wide" style="margin-top: 6px; border-top: 1px solid var(--line); padding-top: 16px;">
+                            <label>个性化特征追踪实体标签（自由输入，中英文逗号分隔，算法会自动与后台海量资源匹配）</label>
+                            <input id="tags" type="text" placeholder="例如：新能源, SUV, 混动, 选购攻略">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button id="btn-submit" type="submit" class="button">生成分析报告</button>
+                        <button id="btn-reset" type="button" class="ghost-button">重置输入</button>
+                    </div>
+                    <div id="submit-status" class="status"></div>
+                </div>
+
+                <!-- 专家微调面板：AHP 权重锁定 (±0.1) -->
+                <div class="card side-card">
+                    <h3 style="margin:0 0 16px;">AHP 专家分配权重调节</h3>
+                    <p style="color:var(--muted); font-size:13px; margin:0 0 20px; line-height:1.6;">因子得分由算法动态测算，右侧滑动条代表 AHP 决策矩阵。浮动范围严格锁定为基准的 ±0.10，总和必须等于 1.00。</p>
+                    <div class="side-list">
+                        <div class="field">
+                            <label>情感倾向权重 [0.25 - 0.45] <span id="emotion_text" class="hint">0.35</span></label>
+                            <input id="emotion" type="range" min="0.25" max="0.45" step="0.01" value="0.35">
+                        </div>
+                        <div class="field">
+                            <label>热点匹配权重 [0.20 - 0.40] <span id="hot_text" class="hint">0.30</span></label>
+                            <input id="hot" type="range" min="0.20" max="0.40" step="0.01" value="0.30">
+                        </div>
+                        <div class="field">
+                            <label>历史成功权重 [0.10 - 0.30] <span id="history_text" class="hint">0.20</span></label>
+                            <input id="history" type="range" min="0.10" max="0.30" step="0.01" value="0.20">
+                        </div>
+                        <div class="field">
+                            <label>内容时效权重 [0.05 - 0.25] <span id="timeliness_text" class="hint">0.15</span></label>
+                            <input id="timeliness" type="range" min="0.05" max="0.25" step="0.01" value="0.15">
+                        </div>
+                    </div>
+                    <div class="weight-sum-box">
+                        当前微调权重之和：<b id="weight_total_txt">1.00</b>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- 视图 3：报告 -->
+        <section id="view-report" class="view">
+            <div class="section-head">
+                <div>
+                    <h2 class="section-title">多维评估报告主页</h2>
+                    <p id="report-subtitle" class="section-desc">报告生成后会集中展示得分、匹配依据和优化建议。</p>
+                </div>
+                <button id="btn-goto-rewrite" class="button" style="display:none;">一键跳转脚本重写 &rarr;</button>
+            </div>
+            <div id="report-content" class="empty-state">
+                还没有报告。请先进入 DDS 输入页并点击“生成分析报告”。
+            </div>
+        </section>
+
+        <!-- 视图 4：AI 重写 -->
+        <section id="view-rewrite" class="view">
+            <div class="section-head">
+                <div>
+                    <h2 class="section-title">高级 AI 智能优化重写</h2>
+                    <p id="rewrite-subtitle" class="section-desc">生成报告后，可从第三页点击按钮进入这里生成完整脚本。</p>
+                </div>
+                <button id="btn-trigger-ai" class="button" style="display:none;">一键生成 AI 脚本</button>
+            </div>
+            <div id="rewrite-content" class="empty-state">
+                还没有 AI 脚本。请先生成 third页报告，再点击“一键生成 AI 脚本”。
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const views = ['intro', 'input', 'report', 'rewrite'];
+        const form = document.getElementById('dds-form');
+        const submitBtn = document.getElementById('btn-submit');
+        const resetBtn = document.getElementById('btn-reset');
+        const newReportBtn = document.getElementById('btn-new-report');
+        const statusEl = document.getElementById('submit-status');
+        const gotoRewriteBtn = document.getElementById('btn-goto-rewrite');
+        const triggerAiBtn = document.getElementById('btn-trigger-ai');
+        const reportSubtitle = document.getElementById('report-subtitle');
+        const reportContent = document.getElementById('report-content');
+        const rewriteSubtitle = document.getElementById('rewrite-subtitle');
+        const rewriteContent = document.getElementById('rewrite-content');
+        const weightTotalTxt = document.getElementById('weight_total_txt');
+
+        const sliderIds = ['emotion', 'hot', 'history', 'timeliness'];
+
+        let latestReportData = null;
+        let latestReportPayload = null;
+
+        // 页面切换驱动
+        function showView(target) {
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                const pill = document.getElementById(`pill-${v}`);
+                if (v === target) {
+                    el.classList.add('active');
+                    pill.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                    pill.classList.remove('active');
+                }
+            });
+            window.scrollTo(0, 0);
+        }
+
+        window.addEventListener('hashchange', () => {
+            const h = window.location.hash.replace('#', '');
+            if (views.includes(h)) showView(h);
+        });
+
+        // AHP矩阵权重和动态计算
+        function updateWeightTotal() {
+            const w_emotion = parseFloat(document.getElementById('emotion').value) || 0;
+            const w_hot = parseFloat(document.getElementById('hot').value) || 0;
+            const w_history = parseFloat(document.getElementById('history').value) || 0;
+            const w_timeliness = parseFloat(document.getElementById('timeliness').value) || 0;
+            
+            const total = w_emotion + w_hot + w_history + w_timeliness;
+            weightTotalTxt.textContent = total.toFixed(2);
+            
+            if (Math.abs(total - 1.0) > 0.01) {
+                weightTotalTxt.style.color = '#ff6b8a';
+            } else {
+                weightTotalTxt.style.color = '#30e0a1';
+            }
+        }
+
+        sliderIds.forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => {
+                    document.getElementById(`${id}_text`).textContent = Number(input.value).toFixed(2);
+                    updateWeightTotal();
+                });
+            }
+        });
+
+        updateWeightTotal();
+
+        // 提交表单计算
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const emotionWeight = parseFloat(document.getElementById('emotion').value) || 0;
+            const hotWeight = parseFloat(document.getElementById('hot').value) || 0;
+            const historyWeight = parseFloat(document.getElementById('history').value) || 0;
+            const timelinessWeight = parseFloat(document.getElementById('timeliness').value) || 0;
+            
+            const totalWeight = emotionWeight + hotWeight + historyWeight + timelinessWeight;
+
+            if (Math.abs(totalWeight - 1.0) > 0.01) {
+                alert(`【AHP矩阵系数错误】四项专家微调权重之和必须等于 1.00！\n\n当前求和实际为：${totalWeight.toFixed(2)}`);
+                return;
+            }
+
+            statusEl.textContent = '后端自适应算法深度匹配底层数据中，请稍候...';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '计算中...';
+
+            const rawTags = document.getElementById('tags').value.trim();
+            const processedTags = rawTags ? rawTags.split(/[，,]/).map(t => t.trim()).filter(Boolean) : [];
+
+            const payload = {
+                title: document.getElementById('title').value.trim(),
+                domain: document.getElementById('domain').value,
+                content_draft: document.getElementById('content_draft').value.trim(),
+                publish_platform: document.getElementById('publish_platform').value,
+                target_audience: document.getElementById('target_audience').value,
+                content_goal: document.getElementById('content_goal').value,
+                content_structure: document.getElementById('content_structure').value,
+                duration_sec: parseInt(document.getElementById('duration_sec').value) || 60,
+                hook_type: document.getElementById('hook_type').value,
+                scenario: document.getElementById('scenario').value,
+                tags: processedTags, 
+                core_entities: [], // 默认空列表适配后端 structure
+                risk_level: "低",
+                emotion: emotionWeight,
+                hot: hotWeight,
+                history: historyWeight,
+                timeliness: timelinessWeight
+            };
+
+            try {
+                const res = await fetch('/api/v1/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`测算失败 (${res.status}): ${errText}`);
+                }
+                const data = await res.json();
+                latestReportData = data;
+                latestReportPayload = payload;
+
+                statusEl.textContent = '多维决策诊断完成！';
+                renderReport(data);
+                gotoRewriteBtn.style.display = 'inline-flex';
+                triggerAiBtn.style.display = 'inline-flex';
+                location.hash = 'report';
+                
+                setTimeout(() => {
+                    drawRadarChart(data);
+                }, 50);
+
+            } catch (error) {
+                console.error(error);
+                statusEl.textContent = error.message || '评估失败，请稍后重试';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '生成分析报告';
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            form.reset();
+            sliderIds.forEach((id) => {
+                document.getElementById(`${id}_text`).textContent = Number(document.getElementById(id).value).toFixed(2);
+            });
+            updateWeightTotal();
+            statusEl.textContent = '';
+        });
+
+        newReportBtn.addEventListener('click', () => {
+            form.reset();
+            latestReportData = null;
+            latestReportPayload = null;
+            statusEl.textContent = '';
+            
+            sliderIds.forEach((id) => {
+                document.getElementById(`${id}_text`).textContent = Number(document.getElementById(id).value).toFixed(2);
+            });
+            updateWeightTotal();
+
+            reportSubtitle.textContent = '报告生成后会集中展示得分、匹配依据和优化建议。';
+            reportContent.className = 'empty-state';
+            reportContent.innerHTML = '还没有报告。请先进入 DDS 输入页并点击“生成分析报告”。';
+            
+            rewriteSubtitle.textContent = '生成报告后，可从第三页点击按钮进入这里生成完整脚本。';
+            rewriteContent.className = 'empty-state';
+            rewriteContent.innerHTML = '还没有 AI 脚本。请先生成第三页报告，再点击“一键生成 AI 脚本”。';
+            
+            gotoRewriteBtn.style.display = 'none';
+            triggerAiBtn.style.display = 'none';
+            showView('input');
+        });
+
+        // Canvas 雷达图绘制引擎
+        function drawRadarChart(data) {
+    const container = document.getElementById('radarContainer');
+    if (!container) return;
+    const canvas = document.getElementById('radarCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // 1. 获取容器实际宽高（不再假设相等）
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+    if (containerWidth < 50 || containerHeight < 50) return;
+
+    // 2. 设置画布大小（分别设置宽高）
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = containerWidth * dpr;
+    canvas.height = containerHeight * dpr;
+    canvas.style.width = containerWidth + 'px';
+    canvas.style.height = containerHeight + 'px';
+    ctx.scale(dpr, dpr);
+
+    // 3. 中心点坐标（分别计算 X 和 Y）
+    const centerX = containerWidth / 2;
+    const centerY = containerHeight / 2;
+    // 4. 最大半径：取宽高较小值的一半，并减去边距（保证图形完整）
+    const maxRadius = Math.min(containerWidth, containerHeight) / 2 - 30;
+
+    // 得分和标签（不变）
+    const e_val = (data.score_breakdown?.emotion || 0) * 100;
+    const h_val = (data.score_breakdown?.hot || 0) * 100;
+    const hi_val = (data.score_breakdown?.history || 0) * 100;
+    const t_val = (data.score_breakdown?.timeliness || 0) * 100;
+    const scores = [e_val, h_val, hi_val, t_val];
+    const labels = ["情感倾向", "热点匹配度", "历史相似成功度", "内容时效性"];
+
+    ctx.clearRect(0, 0, containerWidth, containerHeight);
+
+    // 5. 同心网格（坐标改用 centerX, centerY）
+    const levels = [0.25, 0.50, 0.75, 1.0];
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1;
+    levels.forEach(level => {
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+            const angle = (i * Math.PI) / 2 - Math.PI / 2;
+            const r = maxRadius * level;
+            const x = centerX + r * Math.cos(angle);
+            const y = centerY + r * Math.sin(angle);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+    });
+
+    // 6. 交叉轴（改用 centerX, centerY）
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - maxRadius);
+    ctx.lineTo(centerX, centerY + maxRadius);
+    ctx.moveTo(centerX - maxRadius, centerY);
+    ctx.lineTo(centerX + maxRadius, centerY);
+    ctx.stroke();
+
+    // 7. 数据多边形（坐标改用 centerX, centerY）
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI) / 2 - Math.PI / 2;
+        const clampedScore = Math.max(0, Math.min(100, scores[i]));
+        const r = (clampedScore / 100) * maxRadius;
+        const x = centerX + r * Math.cos(angle);
+        const y = centerY + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "rgba(36, 211, 238, 0.22)";
+    ctx.fill();
+    ctx.strokeStyle = "#24d3ee";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // 8. 数据圆点（坐标改用 centerX, centerY）
+    for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI) / 2 - Math.PI / 2;
+        const clampedScore = Math.max(0, Math.min(100, scores[i]));
+        const r = (clampedScore / 100) * maxRadius;
+        const x = centerX + r * Math.cos(angle);
+        const y = centerY + r * Math.sin(angle);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.strokeStyle = "#24d3ee";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    // 9. 标签文字（利用左右空间加大水平偏移）
+    const fontSize = Math.max(10, Math.min(containerWidth, containerHeight) / 28);
+    ctx.font = `bold ${fontSize}px 'Microsoft YaHei', sans-serif`;
+    ctx.fillStyle = "#a8b8d0";
+    ctx.textBaseline = "middle";
+
+    // 左右方向额外偏移量，让标签远离边缘
+    const extraOffsetX = 22;  // 左右标签再往外移一些
+    const extraOffsetY = 12;  // 上下标签偏移量
+
+    labels.forEach((label, i) => {
+        const angle = (i * Math.PI) / 2 - Math.PI / 2;
+        let extraX = 0, extraY = 0;
+        if (i === 1) { // 右侧（热点匹配度）→ 向右偏
+            extraX = extraOffsetX;
+        } else if (i === 3) { // 左侧（内容时效性）→ 向左偏
+            extraX = -extraOffsetX;
+        } else { // 上下方
+            extraY = (i === 0 ? -extraOffsetY : extraOffsetY);
+        }
+        const x = centerX + (maxRadius + 10) * Math.cos(angle) + extraX;
+        const y = centerY + (maxRadius + 10) * Math.sin(angle) + extraY;
+
+        if (i === 1) ctx.textAlign = "left";
+        else if (i === 3) ctx.textAlign = "right";
+        else ctx.textAlign = "center";
+
+        ctx.fillText(label, x, y);
+    });
+}
+
+        // 动态渲染评估报告
+        function renderReport(data) {
+            reportSubtitle.textContent = `针对选题《${latestReportPayload.title}》依托画像体系与自适应底层数据深度交叉拟合算力报告：`;
+            
+            let casesHtml = '';
+            if(data.top_cases && data.top_cases.length > 0) {
+                data.top_cases.forEach(c => {
+                    casesHtml += `
+                        <div class="case-item">
+                            <b>${c.title || '无标题'}</b>
+                            <div class="case-meta">
+                                <span class="tag">底层映射赛道: ${c.domain || '通用'}</span>
+                                <span class="tag">多维相似度: ${((c.similarity || 0)*100).toFixed(1)}%</span>
+                                <span class="tag">完播率参考常数: ${((c.completion_rate || 0)*100).toFixed(1)}%</span>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                casesHtml = '<p style="color:var(--muted)">数据层暂无关联爆款案例支撑。</p>';
+            }
+
+            let rulesHtml = '';
+            if(data.triggered_rules && data.triggered_rules.length > 0) {
+                data.triggered_rules.forEach(r => {
+                    rulesHtml += `
+                        <div class="rule-item" style="border-left: 4px solid var(--warn);">
+                            <b>触发策略风控: ${r.rule_name || '合规机制'}</b>
+                            <p style="margin:4px 0 0; font-size:13px; color:var(--muted)">优化导向: ${r.reason || ''}</p>
+                        </div>`;
+                });
+            } else {
+                rulesHtml = '<p style="color:var(--good)">👍 符合全网合规发布策略，未触发安全运营阈值限制。</p>';
+            }
+
+            let adviceHtml = '';
+            if(data.optimizations && data.optimizations.length > 0) {
+                data.optimizations.forEach(a => {
+                    adviceHtml += `<div class="advice-item">${a}</div>`;
+                });
+            } else {
+                adviceHtml = '<p style="color:var(--muted)">暂无特定调优策略建议。</p>';
+            }
+
+            const e_score = (data.score_breakdown?.emotion || 0) * 100;
+            const h_score = (data.score_breakdown?.hot || 0) * 100;
+            const hi_score = (data.score_breakdown?.history || 0) * 100;
+            const t_score = (data.score_breakdown?.timeliness || 0) * 100;
+
+            const w_e = latestReportPayload.emotion;
+            const w_h = latestReportPayload.hot;
+            const w_hi = latestReportPayload.history;
+            const w_t = latestReportPayload.timeliness;
+
+            reportContent.className = 'report-stack';
+            reportContent.innerHTML = `
+                <div class="report-hero">
+                    <div class="card score-card">
+                        <h3 style="margin:0; font-size:16px; color:var(--muted);">综合决策总得分</h3>
+                        <div class="score-ring" style="--score: ${data.final_score}">
+                            <strong>${data.final_score}</strong>
+                        </div>
+                    </div>
+                    <div class="card radar-card">
+                        <div class="radar-layout">
+                            <div class="radar-chart-container" id="radarContainer">
+                                <canvas id="radarCanvas"></canvas>
+                            </div>
+                            <div class="radar-dimensions">
+                                <div class="dimension-row">
+                                    <div class="dimension-meta"><b>情感倾向</b><span>得分: ${e_score.toFixed(1)}</span></div>
+                                    <div class="dimension-track"><span style="width: ${e_score}%"></span></div>
+                                </div>
+                                <div class="dimension-row">
+                                    <div class="dimension-meta"><b>热点匹配度</b><span>得分: ${h_score.toFixed(1)}</span></div>
+                                    <div class="dimension-track"><span style="width: ${h_score}%"></span></div>
+                                </div>
+                                <div class="dimension-row">
+                                    <div class="dimension-meta"><b>历史相似成功度</b><span>得分: ${hi_score.toFixed(1)}</span></div>
+                                    <div class="dimension-track"><span style="width: ${hi_score}%"></span></div>
+                                </div>
+                                <div class="dimension-row">
+                                    <div class="dimension-meta"><b>内容时效性</b><span>得分: ${t_score.toFixed(1)}</span></div>
+                                    <div class="dimension-track"><span style="width: ${t_score}%"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-grid">
+                    <div class="card report-card"><h3>📚 后台 CBR 历史案例资源库检索</h3>${casesHtml}</div>
+                    <div class="card report-card"><h3>🛡️ 全域 RBR 运营风控合规校验</h3>${rulesHtml}</div>
+                </div>
+                <div class="card report-summary">
+                    <h3>💡 画像自适应策略诊断意见</h3>
+                    <div class="horizontal-list">${adviceHtml}</div>
+                </div>`;
+        }
+
+        gotoRewriteBtn.addEventListener('click', () => { location.hash = 'rewrite'; });
+
+        // 一键触发大模型重写优化
+        triggerAiBtn.addEventListener('click', async () => {
+            if (!latestReportPayload) return;
+            triggerAiBtn.disabled = true;
+            triggerAiBtn.textContent = '大模型加载中...';
+            rewriteContent.className = 'empty-state';
+            rewriteContent.textContent = 'AI 正在智能提取上述通用画像特征注入大模型 Prompt 算力清洗中，请稍候...';
+
+            try {
+                const res = await fetch('/api/v1/script', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(latestReportPayload)
+                });
+                const result = await res.json();
+                renderRewriteResult(result);
+            } catch (err) {
+                rewriteContent.textContent = `脚本生成异常: ${err.message || err}`;
+            } finally {
+                triggerAiBtn.disabled = false;
+                triggerAiBtn.textContent = '一键生成 AI 脚本';
+            }
+        });
+
+        function renderRewriteResult(data) {
+            rewriteSubtitle.textContent = `AI 口播脚本清洗及镜头重组规划完成。`;
+            let finalData = {};
+            if(data.status === 'ok' && data.result) {
+                finalData = data.result;
+            } else if(data.fallback) {
+                finalData = data.fallback;
+            }
+
+            let shotHtml = '';
+            if(finalData.shot_plan && finalData.shot_plan.length > 0) {
+                finalData.shot_plan.forEach((s, i) => {
+                    shotHtml += `<p style="margin:6px 0; font-size:14px;"><b>镜号 ${i+1}:</b> ${s}</p>`;
+                });
+            }
+
+            rewriteContent.className = 'report-stack';
+            rewriteContent.innerHTML = `
+                <div class="card report-summary">
+                    <div class="summary-title">
+                        <h2 style="margin:0; font-size:22px;">✨ 决策调优输出成果：《${finalData.title || latestReportPayload.title}》</h2>
+                        <span class="level-badge">高度拟合爆款</span>
+                    </div>
+                    <div style="margin-top:14px; border-left:4px solid var(--brand-2); padding-left:12px;">
+                        <b>🔥 匹配生成的黄金开头钩子 (Opening Hook):</b>
+                        <p style="margin:4px 0 0; color:var(--brand-3); font-size:16px; font-weight:800;">“${finalData.opening_hook || '未生成'}”</p>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <b>📝 基于通用画像（目标受众/内容结构）清洗后的完整口播文案脚本:</b>
+                        <div style="background:rgba(0,0,0,0.2); padding:16px; border-radius:12px; margin-top:8px; line-height:1.8; white-space:pre-wrap; color:#e2edfd;">${finalData.full_script || '未生成'}</div>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <b>🎬 推荐分镜头方案与运镜建议:</b>
+                        <div style="background:rgba(255,255,255,0.03); padding:14px; border-radius:12px; margin-top:8px;">${shotHtml || '主讲人居中口播机位，搭配关键文本卡片双向交付。'}</div>
+                    </div>
+                </div>`;
+        }
+
+        const initialHash = window.location.hash.replace('#', '');
+        if (views.includes(initialHash)) showView(initialHash);
+    </script>
+</body>
+</html>
